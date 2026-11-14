@@ -1,12 +1,205 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>openVoice releases</title>
-  </head>
-  <body>
-    <h1>openVoice releases</h1>
-    <p>Release downloads will be published here.</p>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>openVoice downloads</title>
+  <style>
+    :root { color-scheme: light dark; font: 1rem/1.6 system-ui, sans-serif; }
+    body { max-width: 65rem; margin: auto; padding: 2rem 1rem; }
+    h1, h2, h3 { line-height: 1.2; }
+    a { color: light-dark(#0645ad, #9dc7ff); }
+    .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: 1rem; }
+    article { border: 1px solid #888; border-radius: .5rem; padding: 1rem; }
+    dt { font-weight: bold; }
+    dd { margin: 0 0 .7rem; overflow-wrap: anywhere; }
+    code { overflow-wrap: anywhere; }
+    .download { display: inline-block; border: 2px solid currentColor; border-radius: .3rem; padding: .4rem .8rem; margin-right: 1rem; }
+    #status { padding: .75rem; border-left: .25rem solid #888; }
+    #status[data-state="error"] { border-color: #d54b3e; }
+    button { font: inherit; padding: .3rem .8rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>openVoice downloads</h1>
+    <p>Offline dictation for Apple Silicon Macs and x64 Windows PCs. Stable releases are published independently for each platform.</p>
+  </header>
+  <main>
+    <p id="status" role="status" aria-live="polite">Loading release information…</p>
+    <button id="refresh" type="button" hidden>Refresh release information</button>
+    <noscript><p>JavaScript is required to load and validate release information. No download is offered until the feed can be checked.</p></noscript>
+    <div class="platforms">
+      <article aria-labelledby="mac-title">
+        <h2 id="mac-title">macOS · Apple Silicon (arm64)</h2>
+        <div id="macos-arm64"><p>Release availability has not been checked.</p></div>
+        <p>Speech models and voice activity detection data download after installation; dictation then works offline.</p>
+      </article>
+      <article aria-labelledby="windows-title">
+        <h2 id="windows-title">Windows · x64</h2>
+        <div id="windows-x64"><p>Release availability has not been checked.</p></div>
+        <p>The portable Windows archive includes the speech models. Keep the complete extracted folder together.</p>
+      </article>
+    </div>
+    <section aria-labelledby="install-title">
+      <h2 id="install-title">Install or replace manually</h2>
+      <ol>
+        <li>Choose your exact platform and architecture. Read its release notes and minimum OS requirement before downloading. Windows minimums use the NT version/build tuple (for example, Windows 11 still uses 10.0 builds). This page does not detect your OS or installed version.</li>
+        <li>Download the ZIP using your browser. Compare its exact byte size and SHA-256 with the published values before extracting. On macOS, run <code>shasum -a 256 "/path/to/archive.zip"</code>; in Windows PowerShell, run <code>Get-FileHash "C:\path\to\archive.zip" -Algorithm SHA256</code>. Hexadecimal letter case does not affect the comparison. A displayed checksum alone does not verify your downloaded file.</li>
+        <li>Quit the running app. On macOS, extract and replace <code>Dictation.app</code> in your Applications folder. On Windows, extract to a new portable folder and replace the old folder as a whole, keeping bundled models and license notices. Update shortcuts if the folder moved.</li>
+        <li>Launch the new copy and follow its permission/setup prompts. Downloads, installation and replacement are never automatic.</li>
+      </ol>
+      <p>Existing installations need one manual upgrade to a checker-enabled build to discover future stable releases. Prereleases are excluded from this feed.</p>
+    </section>
+    <p>This page requests only <a href="./latest.json">the static release feed</a>. No recordings or transcripts are sent. GitHub receives ordinary HTTPS request metadata. There are no analytics, third-party scripts or account sign-in requirements.</p>
+  </main>
+  <script>
+    "use strict";
+
+    // Keep aligned with distribution/manifest.schema.json and docs/updates.md.
+    const platformKeys = ["macos-arm64", "windows-x64"];
+    const fields = ["version", "build", "minOS", "publishedAt", "channel", "downloadURL", "releaseNotesURL", "sha256", "sizeBytes"];
+    const end = "(?![\\s\\S])";
+    const matches = (value, pattern) => typeof value === "string" && new RegExp("^(?:" + pattern + ")" + end).test(value);
+    const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
+    const keysAllowed = (value, allowed) => object(value) && Object.keys(value).every(key => allowed.includes(key));
+    const positiveInteger = value => Number.isSafeInteger(value) && value > 0;
+
+    function parseUniqueJSON(text) {
+      const result = JSON.parse(text);
+      // JSON.parse validates syntax but silently accepts duplicate keys. Walk the
+      // valid token stream too, comparing decoded keys (including escaped names).
+      const tokens = text.match(/"(?:[^"\\]|\\.)*"|[{}\[\]:,]|true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g);
+      let position = 0;
+      function walk() {
+        const token = tokens[position++];
+        if (token === "{") {
+          const seen = new Set();
+          while (tokens[position] !== "}") {
+            const key = JSON.parse(tokens[position++]);
+            if (seen.has(key)) throw new Error("Duplicate key");
+            seen.add(key);
+            position++; // colon
+            walk();
+            if (tokens[position] !== ",") break;
+            position++;
+          }
+          position++;
+        } else if (token === "[") {
+          while (tokens[position] !== "]") {
+            walk();
+            if (tokens[position] !== ",") break;
+            position++;
+          }
+          position++;
+        }
+      }
+      walk();
+      return result;
+    }
+
+    function validDate(value) {
+      if (!matches(value, "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z") || value.startsWith("0000")) return false;
+      const date = new Date(value);
+      return Number.isFinite(date.getTime()) && date.toISOString() === value.replace("Z", ".000Z");
+    }
+
+    function validLinks(release) {
+      const base = "https://github\\.com/f3d0t/openVoice-releases/releases/";
+      const segment = "[A-Za-z0-9][A-Za-z0-9._-]{0,127}";
+      if (!matches(release.downloadURL, base + "download/" + segment + "/" + segment + "\\.zip") ||
+          !matches(release.releaseNotesURL, base + "tag/" + segment)) return false;
+      const download = new URL(release.downloadURL);
+      const notes = new URL(release.releaseNotesURL);
+      for (const [url, original] of [[download, release.downloadURL], [notes, release.releaseNotesURL]]) {
+        if (url.href !== original || url.protocol !== "https:" || url.host !== "github.com" ||
+            url.username || url.password || url.port || url.search || url.hash) return false;
+      }
+      const tag = download.pathname.split("/")[5];
+      return tag === notes.pathname.split("/")[5] &&
+        !["latest", "stable", "nightly", "canary", "alpha", "beta", "rc"].includes(tag.toLowerCase());
+    }
+
+    function validateFeed(feed) {
+      if (object(feed) && Number.isInteger(feed.schemaVersion) && feed.schemaVersion !== 1) throw new Error("Unsupported feed version");
+      if (!keysAllowed(feed, ["schemaVersion", "platforms"]) || feed.schemaVersion !== 1 ||
+          !keysAllowed(feed.platforms, platformKeys)) throw new Error("Invalid feed");
+      for (const release of Object.values(feed.platforms)) {
+        if (release === null) continue;
+        if (!keysAllowed(release, fields) || !fields.every(field => Object.hasOwn(release, field)) ||
+            !matches(release.version, "[A-Za-z0-9][A-Za-z0-9 ._+()-]{0,63}") ||
+            !positiveInteger(release.build) || !positiveInteger(release.sizeBytes) ||
+            !matches(release.minOS, "(0|[1-9][0-9]{0,8})(\\.(0|[1-9][0-9]{0,8})){0,3}") ||
+            !validDate(release.publishedAt) || release.channel !== "stable" ||
+            !matches(release.sha256, "[0-9a-f]{64}") || !validLinks(release)) throw new Error("Invalid feed");
+      }
+      return feed;
+    }
+
+    function element(tag, text) {
+      const node = document.createElement(tag);
+      node.textContent = text;
+      return node;
+    }
+
+    function renderPlatform(key, release) {
+      const container = document.getElementById(key);
+      container.replaceChildren();
+      if (release == null) {
+        container.append(element("p", "No stable release is available for this platform yet."));
+        return;
+      }
+      container.append(element("p", "Stable release available"));
+      const details = document.createElement("dl");
+      for (const [label, value] of [
+        ["Version", release.version], ["Build", release.build], ["Minimum OS", release.minOS],
+        ["Published (UTC)", release.publishedAt],
+        ["Archive size", `${release.sizeBytes.toLocaleString("en-US")} bytes (${(release.sizeBytes / 1048576).toFixed(2)} MiB)`],
+        ["SHA-256", release.sha256]
+      ]) details.append(element("dt", label), element("dd", String(value)));
+      const download = element("a", "Download ZIP");
+      download.className = "download";
+      download.href = release.downloadURL;
+      const notes = element("a", "Release notes");
+      notes.href = release.releaseNotesURL;
+      container.append(details, download, notes);
+    }
+
+    async function loadFeed() {
+      const status = document.getElementById("status");
+      const refresh = document.getElementById("refresh");
+      refresh.disabled = true;
+      status.dataset.state = "loading";
+      status.textContent = "Loading release information…";
+      for (const key of platformKeys) document.getElementById(key).replaceChildren(element("p", "Checking release availability…"));
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        // Relative path preserves /openVoice-releases/ on project Pages sites.
+        const response = await fetch("./latest.json", { cache: "no-store", credentials: "omit", redirect: "error", signal: controller.signal });
+        if (!response.ok) throw new Error("Feed request failed");
+        const text = await response.text();
+        if (text.length > 65536) throw new Error("Feed too large");
+        const feed = validateFeed(parseUniqueJSON(text));
+        for (const key of platformKeys) renderPlatform(key, feed.platforms[key]);
+        status.dataset.state = "ready";
+        status.textContent = Object.values(feed.platforms).some(release => release !== null)
+          ? "Stable release information loaded. Check the minimum OS before downloading."
+          : "No stable releases are available yet. Please check back later.";
+      } catch (error) {
+        status.dataset.state = "error";
+        status.textContent = "Release information could not be loaded or validated. No downloads are offered. Please try refreshing later.";
+        for (const key of platformKeys) document.getElementById(key).replaceChildren(element("p", "Release availability is unknown because the feed check failed."));
+      } finally {
+        clearTimeout(timeout);
+        refresh.disabled = false;
+        refresh.hidden = false;
+      }
+    }
+
+    document.getElementById("refresh").addEventListener("click", loadFeed);
+    loadFeed();
+  </script>
+</body>
 </html>

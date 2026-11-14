@@ -1,1 +1,7 @@
-{}
+{
+  "schemaVersion": 1,
+  "platforms": {
+    "macos-arm64": null,
+    "windows-x64": null
+  }
+}

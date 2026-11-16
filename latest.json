@@ -3,7 +3,7 @@
   "platforms": {
     "macos-arm64": null,
     "windows-x64": {
-      "version": "0.1.0",
+      "version": "0.1.1",
       "build": 1,
       "minOS": "10.0.19045",
       "publishedAt": "2026-11-16T19:47:06Z",

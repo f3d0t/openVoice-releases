@@ -4,14 +4,14 @@
     "macos-arm64": null,
     "windows-x64": {
       "version": "0.1.0",
-      "build": 3,
+      "build": 4,
       "minOS": "10.0.19045",
-      "publishedAt": "2026-11-17T21:25:36Z",
+      "publishedAt": "2026-11-18T09:16:16Z",
       "channel": "stable",
-      "downloadURL": "https://github.com/f3d0t/openVoice-releases/releases/download/win-v0.1.0-build3/Dictation-0.1.0-3-Windows-x64.zip",
-      "releaseNotesURL": "https://github.com/f3d0t/openVoice-releases/releases/tag/win-v0.1.0-build3",
-      "sha256": "431c92aa51cd0a77a3ce6f52ae997a9c70ce581f73be2a900430c5cff3ff1b16",
-      "sizeBytes": 7430019
+      "downloadURL": "https://github.com/f3d0t/openVoice-releases/releases/download/win-v0.1.0-build4/Dictation-0.1.0-4-Windows-x64.zip",
+      "releaseNotesURL": "https://github.com/f3d0t/openVoice-releases/releases/tag/win-v0.1.0-build4",
+      "sha256": "ceec60d26e914687017b2a61adca1f48736eeac369ab4399ca5382b79601b6e7",
+      "sizeBytes": 7598083
     }
   }
 }
